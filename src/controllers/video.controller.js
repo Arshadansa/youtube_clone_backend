@@ -64,6 +64,7 @@ const getAllVideos = asyncHandler(async (req, res) => {
   if (!result.docs || result.docs.length === 0) {
     throw new apiError(404, "No videos found");
   }
+// console.log("new",result.docs);
 
   return res.status(200).json(
     new ApiResponse(
@@ -235,11 +236,38 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
   return res.status(200).json(new ApiResponse(200,video,"Video publish status toggled successfully"))
 });
 
+
+// for user videos
+const getMyVideo = asyncHandler(async (req, res) => {
+  const userId = req.user?._id;
+
+  if (!userId) {
+    throw new apiError(401, "Unauthorized: user not logged in");
+  }
+
+  const myVideos = await Video.find({ owner: userId })
+    .sort({ createdAt: -1 });
+
+  if (!myVideos || myVideos.length === 0) {
+    throw new apiError(404, "No videos found for this user");
+  }
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      myVideos,
+      "User videos fetched successfully"
+    )
+  );
+});
+
+
 export {
   getAllVideos,
   publishAVideo,
   deleteVideo,
   getVideoById,
   updateVideo,
+  getMyVideo,
   togglePublishStatus,
 };

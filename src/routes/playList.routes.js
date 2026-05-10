@@ -12,7 +12,7 @@ import {
 
 const router = Router();
 
-use.router(verifyJwt);
+router.use(verifyJwt);
 
 router.route("/").post(createPlaylist);
 router

@@ -118,7 +118,7 @@ const getUserChannelSubscribers = asyncHandler(async (req, res) => {
     },
     {
       $lookup: {
-        from: "users", // collection name in MongoDB
+        from: "users", 
         localField: "subscriber",
         foreignField: "_id",
         as: "subscriberDetails",

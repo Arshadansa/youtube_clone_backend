@@ -9,67 +9,62 @@ import { Tweet } from "../models/tweets.model.js";
 
 const toggleVideoLike = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
-  // Validate videoId
-  if (!videoId) {
-    throw new apiError(400, "Video ID is required");
-  }
-  if (!mongoose.isValidObjectId(videoId)) {
-    throw new apiError(400, "Invalid Video ID format");
-  }
-  //  Check if like already exists
+
+  if (!videoId) throw new apiError(400, "Video ID is required");
+  if (!mongoose.isValidObjectId(videoId))
+    throw new apiError(400, "Invalid Video ID");
+
   const existingLike = await Like.findOne({
     video: videoId,
-    likedBy: req.user?._id,
+    likedBy: req.user._id,
   });
-  let message = "";
+
   if (existingLike) {
-    // Unlike the video
+    // REMOVE LIKE
     await Like.findByIdAndDelete(existingLike._id);
     await Video.findByIdAndUpdate(videoId, { $inc: { likesCount: -1 } });
-    message = "Like removed successfully";
-  } else {
-    //  Like the video
-    const newLike = await Like.create({
-      video: videoId,
-      likedBy: req.user?._id,
-    });
-    await Video.findByIdAndUpdate(videoId, { $inc: { likesCount: 1 } });
-
-    // Fetch populated like info using aggregation pipeline
-    const pipeline = [
-      {
-        $match: { _id: new mongoose.Types.ObjectId(newLike._id) },
-      },
-      {
-        $lookup: {
-          from: "users",
-          localField: "likedBy",
-          foreignField: "_id",
-          as: "likedBy",
-          pipeline: [{ $project: { fullname: 1, username: 1, avatar: 1 } }],
-        },
-      },
-      { $unwind: "$likedBy" },
-      {
-        $lookup: {
-          from: "videos",
-          localField: "video",
-          foreignField: "_id",
-          as: "video",
-          pipeline: [{ $project: { title: 1, thumbnail: 1, likesCount: 1 } }],
-        },
-      },
-      { $unwind: "$video" },
-    ];
-    const [populatedLike] = await Like.aggregate(pipeline);
 
     return res
       .status(200)
-      .json(new ApiResponse(200, populatedLike, "Video liked successfully"));
+      .json(new ApiResponse(200, { liked: false }, "Like removed"));
   }
 
-  // Return success message for unlike case
-  return res.status(200).json(new ApiResponse(200, {}, message));
+  // ADD LIKE
+  const newLike = await Like.create({
+    video: videoId,
+    likedBy: req.user._id,
+  });
+
+  await Video.findByIdAndUpdate(videoId, { $inc: { likesCount: 1 } });
+
+  // POPULATE LIKE INFO
+  const [populatedLike] = await Like.aggregate([
+    { $match: { _id: new mongoose.Types.ObjectId(newLike._id) } },
+    {
+      $lookup: {
+        from: "users",
+        localField: "likedBy",
+        foreignField: "_id",
+        as: "likedBy",
+        pipeline: [{ $project: { fullname: 1, username: 1, avatar: 1 } }],
+      },
+    },
+    { $unwind: "$likedBy" },
+    {
+      $lookup: {
+        from: "videos",
+        localField: "video",
+        foreignField: "_id",
+        as: "video",
+        pipeline: [{ $project: { title: 1, thumbnail: 1, likesCount: 1 } }],
+      },
+    },
+    { $unwind: "$video" },
+  ]);
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, populatedLike, "Video liked successfully"));
 });
 
 const toggleCommentLike = asyncHandler(async (req, res) => {
